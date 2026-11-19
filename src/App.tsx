@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react'
 import { AnimatePresence, motion, useInView } from 'framer-motion'
 import {
   ArrowDown,
@@ -16,6 +16,10 @@ import {
 } from 'lucide-react'
 import { birthdayConfig, type Memory } from './config/birthday'
 import './App.css'
+
+const BirthdayUniverse = lazy(() =>
+  import('./components/BirthdayUniverse').then((module) => ({ default: module.BirthdayUniverse })),
+)
 
 const placeholderImages = [
   'https://images.unsplash.com/photo-1518199266791-5375a83190b7?auto=format&fit=crop&w=900&q=82',
@@ -67,6 +71,15 @@ function App() {
     return () => window.removeEventListener('scroll', handleScroll)
   }, [])
 
+  useEffect(() => {
+    if (!selectedMemory) return
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setSelectedMemory(null)
+    }
+    document.addEventListener('keydown', handleKeyDown)
+    return () => document.removeEventListener('keydown', handleKeyDown)
+  }, [selectedMemory])
+
   const memories = useMemo(() => birthdayConfig.memories.map((memory, index) => ({ ...memory, image: memory.image || placeholderImages[index] })), [])
 
   const startAudio = () => {
@@ -88,20 +101,25 @@ function App() {
     }
   }
 
-  const revealWish = () => setWish(birthdayConfig.wishes[Math.floor(Math.random() * birthdayConfig.wishes.length)])
+  const revealWish = () => {
+    const choices = birthdayConfig.wishes.filter((item) => item !== wish)
+    setWish(choices[Math.floor(Math.random() * choices.length)])
+  }
 
   return (
     <div className="site-shell">
       <div className="scroll-line"><span style={{ transform: `scaleX(${scrollProgress})` }} /></div>
       <audio ref={audioRef} src={birthdayConfig.assets.music} loop muted={muted} />
       {opened && (
-        <button className="music-control" onClick={toggleAudio} aria-label={playing ? 'Pause music' : 'Play music'}>
+        <div className="music-control">
+          <button className="music-toggle" onClick={toggleAudio} aria-label={playing ? 'Pause music' : 'Play music'}>
           {playing ? <Pause size={15} /> : <Music2 size={15} />}
           <span>{playing ? 'Playing softly' : 'Sound on'}</span>
+          </button>
           <button className="music-mute" onClick={(event) => { event.stopPropagation(); setMuted((value) => !value) }} aria-label={muted ? 'Unmute music' : 'Mute music'}>
             {muted ? <VolumeX size={14} /> : <Volume2 size={14} />}
           </button>
-        </button>
+        </div>
       )}
 
       <AnimatePresence mode="wait">
@@ -141,6 +159,9 @@ function App() {
                 <motion.a href="#memories" className="text-link" variants={reveal} initial="hidden" animate="visible">Step inside <ArrowDown size={15} /></motion.a>
               </div>
               <div className="hero-portrait">
+                <Suspense fallback={null}>
+                  <BirthdayUniverse />
+                </Suspense>
                 <div className="portrait-ring ring-one" /><div className="portrait-ring ring-two" />
                 <div className="hero-image" />
                 <div className="hero-caption"><span>for the girl who makes<br />ordinary days feel golden</span><Heart size={17} fill="currentColor" /></div>
@@ -176,7 +197,7 @@ function App() {
         )}
       </AnimatePresence>
 
-      <AnimatePresence>{selectedMemory && <motion.div className="modal-backdrop" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setSelectedMemory(null)}><motion.div className="memory-modal" initial={{ y: 24, scale: .96 }} animate={{ y: 0, scale: 1 }} exit={{ y: 24, scale: .96 }} onClick={(event) => event.stopPropagation()}><button className="modal-close" onClick={() => setSelectedMemory(null)} aria-label="Close memory"><X size={18} /></button><img src={selectedMemory.image || placeholderImages[0]} alt={selectedMemory.caption} /><div><small>{selectedMemory.label}</small><h3>{selectedMemory.caption}</h3><p>This space is ready for a memory that is uniquely yours.</p></div></motion.div></motion.div>}</AnimatePresence>
+      <AnimatePresence>{selectedMemory && <motion.div className="modal-backdrop" role="presentation" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setSelectedMemory(null)}><motion.div className="memory-modal" role="dialog" aria-modal="true" aria-labelledby="memory-title" initial={{ y: 24, scale: .96 }} animate={{ y: 0, scale: 1 }} exit={{ y: 24, scale: .96 }} onClick={(event) => event.stopPropagation()}><button className="modal-close" onClick={() => setSelectedMemory(null)} aria-label="Close memory"><X size={18} /></button><img src={selectedMemory.image || placeholderImages[0]} alt={selectedMemory.caption} /><div><small>{selectedMemory.label}</small><h3 id="memory-title">{selectedMemory.caption}</h3><p>This space is ready for a memory that is uniquely yours.</p></div></motion.div></motion.div>}</AnimatePresence>
     </div>
   )
 }
